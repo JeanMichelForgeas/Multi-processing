@@ -1,0 +1,148 @@
+************************************************************************
+
+           Ces fichiers sur les process et code reentrant doivent
+        etre distribues gratuitement a tout le monde.
+
+
+           Distribuez tous les fichiers ensemble sinon ce serait
+        inutilisable.
+
+
+
+           Lancement de cette demo:
+
+                CD ladirectorydecesfichiers
+                Pere Fils n   (n est le nombre de process que vous voulez)
+                          essayez 4 ou 15 ou 36 ou 300 si vous avez des Megs
+
+           Pour arreter tout ca:
+
+                - ecrire 'logoff' (sans les ') dans chaque fenetre
+                - le pere s'arrete tout seul apres le dernier fils
+
+
+
+           Pour compiler:
+
+                Prendre un Lattice,
+
+                LC1 -iINCLUDE: Pere
+                LC2 -v Pere
+                BLink FROM LIB:AStartup.obj+Pere.o TO Pere LIBRARY LIB:Amiga.lib+LC.lib VERBOSE NODEBUG
+
+                LC1 -iINCLUDE: Fils
+                LC2 -v Fils
+                BLink FROM LIB:StartProc.obj+Fils.o TO Fils LIBRARY LIB:Amiga.lib VERBOSE NODEBUG
+
+
+
+        Comment ca fonctionne ?
+
+           Le pere charge le code en memoire, puis lance autant de process
+        que l'on veut dessus. Le code est comme un corps inerte, le process
+        est l'etincelle qui le fait vivre.
+
+           Le pere ouvre 2 ports. Son process en a deja un que l'on peut
+        trouver (voir au debut du fils) mais on ne l'utilise pas, car le
+        DOS cause avec lui, et le seul truc qu'on peut avoir est un gourou
+        (87000004 = unexpected reveived packet).
+           Le 1er port sert a initialiser les fils et recevoir leur reponse
+        qui est soit OK soit un code erreur. Le pere change alors le 
+        "reply port" dans son message et entame le dialogue avec le fils
+        qui lui repondra donc sur le 2eme port.
+           Le pere peut ensuite creer un autre message et initialiser un 
+        autre fils en se servant du premier port.
+
+           Chaque fils detecte le message d'initialisation sur le port de
+        son process. Il se cree ensuite un port suplementaire et ne se 
+        servira plus de celui du process (dans la structure Process). Avant
+        de repondre OK au pere, il place l'adresse du port qu'il a cree
+        dans le message qu'il retourne au pere (ReplyMsg) pour que celui-ci
+        sache a qui il s'adresse.
+           Comme il y a un message par fils, chaque message a en lui l'adresse
+        du port du fils qui l'a utilise. le pere n'a qu'a regarder qui lui
+        a ecris pour savoir a qui ecrire.
+
+           Les fils se comportent comme des terminaux, et le code qui les
+        gere est dans le pere. Il suffirait par exemple de faire memoriser
+        au pere les ports de tous ses fils, et de rajouter un peu de code,
+        pour avoir un serveur multivoies sur un ecran Amiga...
+           Si vous faites ca, n'utilisez pas des tableaux pour memoriser,
+        car ca limite le nombre de fils a la taille du tableau, mais
+        utilisez plutot les fonction de LIST de l'EXEC, qui sont tres
+        pratiques. Notez qu'elles permettent meme de faire des arborescences
+        en definissant des NODES dans des listes triees (par l'Exec) en 
+        tant que HEADER d'autre listes...
+
+
+        Le startproc.obj:
+
+           C'est un astartup.obj modifie pour permettre de faire du code
+        reentrant. Certains diront qu'il n'y a qu'a enlever le startup, et
+        de terminer les process avec des RemTask(), mais c'est se priver
+        de 2 choses:
+
+             -  la fonction exit() qui permet de terminer le process a 
+              n'importe quel endroit du code, meme dans la 30eme fonction
+              imbriquee, car elle repositionne le pointeur de pile de ce 
+              process avant de faire un RTS pour sortir definitivement.
+
+             -  la possibilite de faire faire des AllocMem() par un process
+              car chaque fils doit desallouer la memoire qu'il a emprumte
+              au systeme avant de se terminer, ce que RemTask ne permet pas.
+
+           D'ou une possibilite interressante: il est fastidieux pour faire
+        du reentrant de devoir passer toutes les variable sous forme de
+        parametre, et de n'en avoir aucune de GLOBALE ni de STATIQUE. Une
+        alternative simple pour ne pas reecrire tous vos programmes est la
+        technique utilisee dans le fils, qui consiste a definir une structure
+        comportant toutes vos variables globales, et de faire une allocation
+        memoire a l'image de cette structure. Il ne reste plus qu'un seul
+        parametre a passer entre toutes les fonctions: l'adresse du bloc
+        memoire ou elles vont pouvoir ecrire et lire a loisir car il y aura
+        un bloc alloue par process.
+           En faisant communiquer les process entre eux par leur ports, il
+        serait meme possible qu'ils accedent tous a un meme ensemble de 
+        donnees... Mais la il ne faut pas que l'un ecrive pendant que
+        l'autre lise, sinon SCRATCH!   Il existe 2 solutions: quand un 
+        process ecrit dans une telle zone partagee, il peut faire Forbid()
+        avant et Permit() apres, ou utiliser les Semaphores de l'Exec qui
+        permettraient aux process de se synchroniser en bloquant puis 
+        liberant la zone a tour de role.
+
+
+
+           Amusez-vous bien, c'est magique de voir qu'une seule instruction
+        d'ouverture de fenetre permet d'en ouvrir des tas !
+
+
+        -------------------------------------------------------------------
+
+
+
+
+        Vous pouvez distribuer ces fichiers a condition que ce soit tous
+        ensemble:
+
+                proc.h          le fichier include (structure message)
+                Pere.c          le source
+                Fils.c          le source
+                StartProc.asm   le source
+                Pere            l'executable
+                Fils            l'executable
+                StartProc.obj   l'executable
+                README          ces explications
+
+
+        Vous pouvez aussi les traduire en anglais (mieux que moi) pour
+        les envoyer a Fred FISH.
+
+
+
+        Si amelioration et desir de partager, laisser un message a:
+
+        Jean-Michel FORGEAS, le SYSOP de FLam avec Alex LIVSHITS, 
+
+        ou bien:
+
+        SYSOP, Serveur FLam, Tel: 47-58-76-15 (France)
